@@ -12,7 +12,6 @@ data/backups/
 
 # Backup manual del DWH (56MB, demasiado para GitHub — guardar en USB/local)
 # install.sh lo busca en ~/dwh_backup.sql automáticamente
-dwh_backup.sql
 
 # SQLites originales (descargar desde Kaggle)
 DataGripProject/
