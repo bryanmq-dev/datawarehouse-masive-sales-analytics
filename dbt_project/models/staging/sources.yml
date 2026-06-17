@@ -1,0 +1,54 @@
+version: 2
+
+sources:
+    - name: staging_wwi
+      schema: staging_postgresql_world_wide_importers
+      tables:
+        - name: vw_dwh_ventas
+        - name: vw_dwh_productos
+        - name: vw_dwh_clientes
+        - name: vw_dwh_metodos_pago
+    - name: staging_olist
+      schema: staging_sqlserver_olist
+      tables:
+        - name: vw_dwh_olist_clientes
+        - name: vw_dwh_olist_productos
+        - name: vw_dwh_olist_ventas
+        - name: olist_orders_dataset
+        - name: olist_customers_dataset
+    - name: staging_diffsales
+      schema: staging_sqlite_diff_store_sales
+      tables: 
+        - name: vw_dwh_diffstore_clientes
+        - name: vw_dwh_diffstore_productos
+        - name: vw_dwh_diffstore_tiendas
+        - name: vw_dwh_diffstore_ventas
+    - name: staging_retailsales
+      schema: staging_sqlite_retail_store_sales
+      tables:
+        - name: vw_dwh_retail_clientes
+        - name: vw_dwh_retail_productos
+        - name: vw_dwh_retail_ventas
+    - name: staging_supersales
+      schema: staging_sqlite_super_store_sales
+      tables:
+        - name: vw_supermarket_kpis
+    - name: dwh_destination
+      schema: dwh
+      tables:
+        - name: dim_canal
+        - name: dim_cliente
+        - name: dim_metodo_pago
+        - name: dim_origen
+        - name: dim_producto
+        - name: dim_region
+        - name: dim_tiempo
+        - name: dim_tienda
+        - name: fact_ventas_detalle
+
+    - name: staging_mongo
+      schema: staging_mongo
+      tables:
+        - name: transactions_flat
+        - name: customers_flat
+        - name: accounts_flat

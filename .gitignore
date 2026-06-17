@@ -1,0 +1,61 @@
+# ============================================================
+# DATOS — demasiado grandes o se descargan desde fuente oficial
+# ============================================================
+
+# PostgreSQL data directory del DWH (binarios, no código)
+data/postgres_data/
+
+# SQLites originales (descargar desde Kaggle)
+DataGripProject/
+sqlite_exports/
+
+# Datos crudos de cada origen (descargar desde fuentes oficiales)
+data_sources/
+
+# Backup SQL Server (4.4 GB)
+mssql_data_backup/
+
+# ============================================================
+# SEGURIDAD
+# ============================================================
+mssql_data_backup/secrets/
+*.machine-key
+.env
+.env.*
+secrets/
+
+# ============================================================
+# dbt — archivos generados / entorno Python
+# ============================================================
+dbt_project/env/
+dbt_project/target/
+dbt_project/logs/
+dbt_project/.user.yml
+profiles.yml
+
+# ============================================================
+# Videos / binarios grandes
+# ============================================================
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# ============================================================
+# OS / editores
+# ============================================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+*.pyo
+
+# ============================================================
+# Borradores locales
+# ============================================================
+Informe_DWH_Borrador.docx
+generar_informe.py

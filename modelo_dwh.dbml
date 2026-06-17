@@ -1,0 +1,233 @@
+// ============================================================
+// DWH Sector Ventas y Manufactura — Esquema Estrella
+// Motor: PostgreSQL 16
+// Herramienta: DrawDB (https://drawdb.vercel.app)
+// ============================================================
+
+Project DWH_Ventas {
+  database_type: 'PostgreSQL'
+  Note: '''
+    Data Warehouse — Análisis Multidimensional Sector Ventas
+    Fuentes: WorldWideImporters (WWI), Brazilian Olist, DifferentStoreSales, RetailStoreSales
+    Comparativas externas: SupermarketStoreBranchesSales, MongoDB Analytics
+    Metodología: HEFESTO | ETL: dbt | Visualización: Apache Superset
+  '''
+}
+
+// ─── DIMENSIONES ─────────────────────────────────────────────
+
+Table dim_tiempo {
+  tiempo_key serial [pk, note: 'Surrogate key']
+  fecha date [not null, unique]
+  dia integer [not null, note: '1-31']
+  semana integer [not null, note: '1-53 ISO']
+  mes integer [not null, note: '1-12']
+  trimestre integer [not null, note: '1-4']
+  anio integer [not null]
+  nombre_dia varchar(15) [not null, note: 'Lunes..Domingo']
+  nombre_mes varchar(15) [not null, note: 'Enero..Diciembre']
+  temporada varchar(15) [not null, note: 'Primavera/Verano/Otoño/Invierno']
+  es_fin_semana boolean [not null, default: false]
+
+  indexes {
+    fecha [unique]
+    (anio, mes) [name: 'idx_tiempo_anio_mes']
+    temporada [name: 'idx_tiempo_temporada']
+  }
+}
+
+Table dim_producto {
+  producto_key serial [pk]
+  producto_id_origen varchar(100) [not null, note: 'ID natural del sistema origen']
+  nombre_producto varchar(255) [not null]
+  categoria varchar(100) [not null]
+  subcategoria varchar(100) [null, note: 'Solo RetailStore distingue subcategoría']
+  origen_sistema varchar(20) [not null, note: 'WWI | OLIST | RETAIL | DIFFSTORE']
+
+  indexes {
+    (producto_id_origen, origen_sistema) [unique, name: 'uq_producto_origen']
+    categoria [name: 'idx_producto_categoria']
+  }
+
+  Note: '''
+    WWI: StockItems + StockGroups
+    Olist: products + category_translation (categoria en inglés)
+    RetailStore: Category (categoria) + ItemPurchased (nombre)
+    DiffStore: category (solo nivel categoría, sin nombre individual)
+  '''
+}
+
+Table dim_cliente {
+  cliente_key serial [pk]
+  cliente_id_origen varchar(100) [not null]
+  nombre_cliente varchar(255) [null, note: 'Solo WWI tiene nombre']
+  edad integer [null, note: 'RetailStore y DiffStore']
+  genero varchar(20) [null, note: 'RetailStore: Male/Female | DiffStore: Male/Female']
+  ciudad varchar(100) [null]
+  estado_provincia varchar(100) [null]
+  pais varchar(100) [null, note: 'WWI: multi-país | Olist: Brasil']
+  region_geografica varchar(100) [null, note: 'WWI: SalesTerritory | DiffStore: region']
+  origen_sistema varchar(20) [not null, note: 'WWI | OLIST | RETAIL | DIFFSTORE']
+
+  indexes {
+    (cliente_id_origen, origen_sistema) [unique, name: 'uq_cliente_origen']
+    genero [name: 'idx_cliente_genero']
+    (estado_provincia, pais) [name: 'idx_cliente_geo']
+  }
+
+  Note: '''
+    WWI: Customers join Cities/StateProvinces/Countries — B2B sin demografía personal
+    Olist: customers — ciudad y estado, sin nombre ni demografía
+    RetailStore: CustomerID + Age + Gender — sin geografía
+    DiffStore: customer_id + gender + age + region + state — más completo
+  '''
+}
+
+Table dim_region {
+  region_key serial [pk]
+  ciudad varchar(100) [null]
+  estado_provincia varchar(100) [null]
+  codigo_estado varchar(10) [null]
+  pais varchar(100) [null]
+  continente varchar(50) [null]
+  region_geografica varchar(100) [null, note: 'SalesTerritory (WWI) o region (DiffStore)']
+  latitud decimal(10,7) [null]
+  longitud decimal(10,7) [null]
+  origen_sistema varchar(20) [not null]
+
+  indexes {
+    (ciudad, estado_provincia, pais) [name: 'idx_region_geo']
+  }
+
+  Note: '''
+    WWI: Cities + StateProvinces + Countries — jerarquía completa ciudad/estado/país/continente
+    Olist: geolocation — ciudad y estado brasileño, lat/lng
+    DiffStore: region + state (EE.UU.)
+    RetailStore: sin datos geográficos propios
+  '''
+}
+
+Table dim_metodo_pago {
+  metodo_pago_key serial [pk]
+  tipo_pago_normalizado varchar(50) [not null, note: 'Efectivo/Tarjeta Crédito/Tarjeta Débito/Boleto/Voucher/EFT/Cheque']
+  tipo_pago_origen varchar(50) [not null, note: 'Valor original del sistema fuente']
+  acepta_cuotas boolean [not null, default: false]
+  origen_sistema varchar(20) [not null]
+
+  indexes {
+    tipo_pago_normalizado [name: 'idx_pago_tipo']
+  }
+
+  Note: '''
+    WWI: Application.PaymentMethods (Cash, Credit Card, EFT, Check)
+    Olist: payment_type (credit_card, boleto, voucher, debit_card)
+    RetailStore: PaymentMethod (Card, etc.)
+    DiffStore: payment_method (Credit Card, Cash, Debit Card)
+  '''
+}
+
+Table dim_canal {
+  canal_key serial [pk]
+  tipo_canal varchar(20) [not null, note: 'Online | Offline | B2B']
+  subcategoria_canal varchar(50) [not null]
+  descripcion varchar(200) [null]
+
+  indexes {
+    tipo_canal [name: 'idx_canal_tipo']
+  }
+
+  Note: '''
+    Dimensión derivada (no viene de ningún origen directamente):
+    WWI       → B2B / Manufactura-Distribución
+    Olist     → Online / E-Commerce
+    RetailStore → Offline / Tienda Retail
+    DiffStore → Offline / Centro Comercial
+  '''
+}
+
+Table dim_tienda {
+  tienda_key serial [pk]
+  tienda_id_origen varchar(100) [not null]
+  nombre_mall varchar(200) [null, note: 'DiffStore: shopping_mall']
+  ciudad varchar(100) [null]
+  estado varchar(100) [null]
+  region varchar(100) [null]
+  origen_sistema varchar(20) [not null]
+
+  indexes {
+    (tienda_id_origen, origen_sistema) [unique, name: 'uq_tienda_origen']
+  }
+
+  Note: '''
+    Principalmente de DiffStore (shopping_mall field).
+    RetailStore no tiene información de tienda — usa tienda_key = 1 (genérica).
+  '''
+}
+
+Table dim_origen {
+  origen_key serial [pk]
+  codigo_origen varchar(20) [not null, unique, note: 'WWI | OLIST | RETAIL | DIFFSTORE']
+  nombre_completo varchar(100) [not null]
+  motor_bd varchar(50) [not null, note: 'PostgreSQL | SQL Server | SQLite']
+  tipo_datos varchar(30) [not null, note: 'Granular-B2B | Granular-Ecommerce | Granular-Retail | Granular-Mall']
+  tipo_canal varchar(20) [not null]
+  mercado varchar(50) [not null, note: 'Multinacional | Brasil | Genérico | EE.UU.']
+  registros_aprox integer [null]
+}
+
+// ─── TABLA DE HECHOS ─────────────────────────────────────────
+
+Table fact_ventas_detalle {
+  venta_key bigserial [pk]
+  tiempo_key integer [not null, ref: > dim_tiempo.tiempo_key]
+  producto_key integer [not null, ref: > dim_producto.producto_key]
+  cliente_key integer [not null, ref: > dim_cliente.cliente_key]
+  region_key integer [null, ref: > dim_region.region_key, note: 'NULL para RetailStore (sin geo)']
+  metodo_pago_key integer [not null, ref: > dim_metodo_pago.metodo_pago_key]
+  canal_key integer [not null, ref: > dim_canal.canal_key]
+  tienda_key integer [null, ref: > dim_tienda.tienda_key, note: 'NULL para WWI, Olist']
+  origen_key integer [not null, ref: > dim_origen.origen_key]
+
+  // Medidas aditivas
+  cantidad numeric(12,3) [not null, default: 1]
+  precio_unitario numeric(18,4) [not null]
+  monto_total numeric(18,4) [not null]
+
+  // Medidas parciales (nullable por origen)
+  costo_unitario numeric(18,4) [null, note: 'Solo DiffStore (cost_price_per_unit)']
+  ganancia_neta numeric(18,4) [null, note: 'WWI: LineProfit | DiffStore: (precio-costo)*qty']
+  descuento_pct numeric(6,3) [null, note: 'RetailStore: DiscountApplied(%) | WWI: StandardDiscountPercentage']
+  calificacion_item numeric(3,1) [null, note: 'RetailStore: ItemRating (1-5) | Olist: review_score (join)']
+  tiempo_entrega_dias integer [null, note: 'Solo Olist: delivered_date - purchase_date']
+  cuotas_pago integer [null, note: 'Solo Olist: payment_installments']
+  compras_previas integer [null, note: 'Solo RetailStore: PreviousPurchases']
+  flete_valor numeric(18,4) [null, note: 'Solo Olist: freight_value']
+
+  indexes {
+    tiempo_key [name: 'idx_fact_tiempo']
+    producto_key [name: 'idx_fact_producto']
+    cliente_key [name: 'idx_fact_cliente']
+    canal_key [name: 'idx_fact_canal']
+    origen_key [name: 'idx_fact_origen']
+    (tiempo_key, canal_key) [name: 'idx_fact_tiempo_canal']
+    (tiempo_key, origen_key) [name: 'idx_fact_tiempo_origen']
+  }
+
+  Note: '''
+    Granularidad: 1 fila por línea de venta individual.
+    Fuentes: WWI (228K) + Olist (112K) + DiffStore (99K) + RetailStore (5K) ≈ 445K filas.
+    Columnas NULL son esperadas por diseño — documentadas en diccionario de datos.
+    Fuentes comparativas externas (SupermarketBranches, MongoDB) NO integradas aquí.
+  '''
+}
+
+// ─── VISTAS COMPARATIVAS EXTERNAS (referencia documental) ────
+// Estas NO son tablas del DWH. Se consultan via FDW directamente en Superset.
+
+// SupermarketStoreBranchesSales (SQLite FDW → staging_sqlite_super_store_sales.stores)
+// Columnas: Store_ID, Store_Area, Items_Available, Daily_Customer_Count, Store_Sales
+// Uso: comparar Store_Sales agregado vs SUM(monto_total) del DWH por período
+
+// MongoDB Analytics (CSV exportado por python/mongo_extract.py → FDW file)
+// Columnas: account_id, bucket_start_date, bucket_end_date, transaction_code, symbol, amount, total
+// Uso: correlacionar volumen transacciones financieras vs picos de ventas retail en DWH

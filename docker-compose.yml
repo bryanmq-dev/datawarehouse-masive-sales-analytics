@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  origen_postgres:
+    image: postgres:15
+    container_name: src_postgres
+    environment:
+      POSTGRES_USER: brayan_admin
+      POSTGRES_PASSWORD: super_password_123
+      POSTGRES_DB: e_commerce_br
+    ports:
+      - "5433:5432"
+    volumes:
+      - src_postgres_data:/var/lib/postgresql/data
+
+  origen_sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: src_sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Dwh_Brayan_2026_Enterprise*"
+    ports:
+      - "1434:1433"
+    volumes:
+      - src_sqlserver_data:/var/opt/mssql
+
+  origen_mongodb:
+    image: mongo:latest
+    container_name: src_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: brayan_admin
+      MONGO_INITDB_ROOT_PASSWORD: super_password_123
+    ports:
+      - "27018:27017"
+    volumes:
+      - src_mongodb_data:/data/db
+
+  data_warehouse:
+      build: .
+      container_name: dwh_postgres
+      environment:
+        POSTGRES_USER: brayan_admin
+        POSTGRES_PASSWORD: super_password_123
+        POSTGRES_DB: dwh_ventas_global
+      ports:
+        - "5434:5432"
+      volumes:
+        - ./data/postgres_data:/var/lib/postgresql/data
+        - "/mnt/personal/universidad/5. AAQuinto Semestre/Data Warehousing/ProyectoFinal/DataGripProject:/mnt/sqlite_data"
+        - "/mnt/personal/universidad/5. AAQuinto Semestre/Data Warehousing/ProyectoFinal/mongo_exports:/mnt/mongo_exports"
+
+  # --- VISUALIZACIÓN ---
+  superset:
+    image: apache/superset:latest
+    container_name: superset_bi
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: "llave_secreta_super_pro"
+    depends_on:
+      - data_warehouse
+
+volumes:
+  src_postgres_data:
+  src_sqlserver_data:
+  src_mongodb_data:

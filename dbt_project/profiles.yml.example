@@ -1,0 +1,15 @@
+# Renombrar a ~/.dbt/profiles.yml y ajustar credenciales
+# El target schema "dwh" es donde dbt materializará las tablas
+
+dwh_project:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost       # host del DWH PostgreSQL (o nombre del contenedor Docker)
+      port: 5432
+      dbname: postgres      # nombre de la base de datos DWH
+      user: user
+      password: password
+      schema: dwh           # schema destino para todos los modelos marts
+      threads: 4
