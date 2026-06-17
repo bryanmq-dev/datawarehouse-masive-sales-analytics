@@ -36,29 +36,66 @@ services:
       - src_mongodb_data:/data/db
 
   data_warehouse:
-      build: .
-      container_name: dwh_postgres
-      environment:
-        POSTGRES_USER: brayan_admin
-        POSTGRES_PASSWORD: super_password_123
-        POSTGRES_DB: dwh_ventas_global
-      ports:
-        - "5434:5432"
-      volumes:
-        - ./data/postgres_data:/var/lib/postgresql/data
-        - "/mnt/personal/universidad/5. AAQuinto Semestre/Data Warehousing/ProyectoFinal/DataGripProject:/mnt/sqlite_data"
-        - "/mnt/personal/universidad/5. AAQuinto Semestre/Data Warehousing/ProyectoFinal/mongo_exports:/mnt/mongo_exports"
+    build: .
+    container_name: dwh_postgres
+    environment:
+      POSTGRES_USER: brayan_admin
+      POSTGRES_PASSWORD: super_password_123
+      POSTGRES_DB: dwh_ventas_global
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./data/postgres_data:/var/lib/postgresql/data
+      - ./DataGripProject:/mnt/sqlite_data
+      - ./mongo_exports:/mnt/mongo_exports
+      - ./data/backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brayan_admin -d dwh_ventas_global"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # --- VISUALIZACIÓN ---
+  # Backup automático del DWH — corre cada 24h, retiene 7 días
+  dwh_backup:
+    image: postgres:15
+    container_name: dwh_backup
+    depends_on:
+      data_warehouse:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: super_password_123
+    volumes:
+      - ./data/backups:/backups
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Backup service listo. Primer backup en 60s...' &&
+        sleep 60 &&
+        while true; do
+          FILENAME=\"/backups/dwh_$$(date +%Y%m%d_%H%M%S).sql\" &&
+          pg_dump -h data_warehouse -U brayan_admin dwh_ventas_global > \"$$FILENAME\" &&
+          echo \"Backup guardado: $$FILENAME\" &&
+          find /backups -name '*.sql' -mtime +7 -delete &&
+          echo 'Backups de más de 7 días eliminados.' &&
+          sleep 86400
+        done
+      "
+    restart: unless-stopped
+
   superset:
-    image: apache/superset:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
     container_name: superset_bi
     ports:
       - "8088:8088"
     environment:
       SUPERSET_SECRET_KEY: "llave_secreta_super_pro"
     depends_on:
-      - data_warehouse
+      data_warehouse:
+        condition: service_healthy
+    volumes:
+      - ./superset/home:/app/superset_home
+    restart: unless-stopped
 
 volumes:
   src_postgres_data:

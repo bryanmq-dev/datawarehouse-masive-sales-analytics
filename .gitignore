@@ -2,8 +2,17 @@
 # DATOS — demasiado grandes o se descargan desde fuente oficial
 # ============================================================
 
+.claude/
+
 # PostgreSQL data directory del DWH (binarios, no código)
 data/postgres_data/
+
+# Backups automáticos del DWH (archivos SQL grandes)
+data/backups/
+
+# Backup manual del DWH (56MB, demasiado para GitHub — guardar en USB/local)
+# install.sh lo busca en ~/dwh_backup.sql automáticamente
+dwh_backup.sql
 
 # SQLites originales (descargar desde Kaggle)
 DataGripProject/
@@ -53,6 +62,12 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+
+# ============================================================
+# Superset — solo superset.db va a git, ignorar cache y paquetes pip
+# ============================================================
+superset/home/.cache/
+superset/home/.local/
 
 # ============================================================
 # Borradores locales
