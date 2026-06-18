@@ -3,7 +3,7 @@ FROM apache/superset:latest
 USER root
 
 # psycopg2 para conectar Superset a PostgreSQL DWH
-RUN /app/.venv/bin/pip install --no-cache-dir psycopg2-binary
+RUN uv pip install --python /app/.venv/bin/python --no-cache psycopg2-binary
 
 COPY superset-entrypoint.sh /superset-entrypoint.sh
 RUN chmod +x /superset-entrypoint.sh
